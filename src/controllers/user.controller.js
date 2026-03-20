@@ -11,7 +11,8 @@ const registerUser = asyncHandler(async (req, res)=>{
     // check if user already exists : username, or email
     // check for image, check for avatar(avatar is compulsury)
     // create user object - create entry in database
-
+    // without password and access token
+    // return response
 
 
     const {fullName, email, username, password} = req.body; 
@@ -24,7 +25,9 @@ const registerUser = asyncHandler(async (req, res)=>{
             throw new ApiError(400, "All Fields are required",);
     }
 
-    const existedUser = User.findOne({
+
+    // Checking existing user
+    const existedUser = await User.findOne({
         $or : [{ username }, { email }]
     })
 
@@ -32,8 +35,17 @@ const registerUser = asyncHandler(async (req, res)=>{
         throw new ApiError(409, "User with email or username already exists");
     }
 
+
+    // check for image, check for avatar(avatar is compulsury)
     const avatarLocalPath = req.files?.avatar[0]?.path;
-    const coverImageLocalPath = req.files?.coverImage[0]?.path;
+    // const coverImageLocalPath = req.files?.coverImage[0]?.path;  -----> undefined
+
+
+//  const coverImageLocalPath = req.files?.coverImage?.[0]?.path --------> works, short and crisp 
+    let coverImageLocalPath;
+    if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length>0) {
+        coverImageLocalPath = req.files.coverImage[0].path;
+    }
 
     if(!avatarLocalPath){
         throw ApiError(400, "avatar file is required");
@@ -56,7 +68,7 @@ const registerUser = asyncHandler(async (req, res)=>{
     })
 
     const createdUser = await User.findById(user._id).select(
-        "-password -refreshToken"
+        "-password -refreshToken" // password and refresh token will exclude from the response
     )
 
     if(!createdUser){
@@ -64,7 +76,7 @@ const registerUser = asyncHandler(async (req, res)=>{
     }
 
     return res.status(201).json(
-        new ApiResponse(200, createdUser, "User registered sucessfully")
+        new ApiResponse(200, createdUser, "User registered suces")
     )
 
 })

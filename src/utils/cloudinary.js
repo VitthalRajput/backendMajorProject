@@ -16,8 +16,9 @@ const uploadOnCloudinary = async (localFilePath) =>{
             resource_type:"auto"
         })
         //file uploaded successfully
-        console.log ("File uploaded successfully on cloudinary",
-            response.url); // upload hone ke baad ka url 
+        // console.log ("File uploaded successfully on cloudinary",
+        //     response.url); // upload hone ke baad ka url 
+        fs.unlinkSync(localFilePath);
         return response ; // user ko return krdena
     } catch (error) {
         //file load nhi hui to server pe hai,
