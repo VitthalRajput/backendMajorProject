@@ -45,21 +45,32 @@ const userSchema = new Schema({
     }
 
 },{
-    timeStamps : true
+    timestamps : true
 })
 
-userSchema.pre("save", function (next){
+userSchema.pre("save", async function (next){
     if(!this.isModified("password")) return next();
-    this.password = bcrypt.hash(this.password, 10)
+    this.password = await bcrypt.hash(this.password, 10)
     next()
 })
 
+
+// userSchema.methods --- used to define instance methods
 userSchema.methods.isPasswordCorrect = async function (password){
-    return await bcrypt.compare(password /*password send by user in text form*/, this.password /*encrypt wala password*/)
+    return await bcrypt.compare(password, //clean password
+         this.password // hashed pass from db
+    )
 }
+// equivalent code of above
+// userSchema.methods = {
+//     isPasswordCorrect : function(password){
+//         return bcrypt.compare(password, this.password);
+//     }
+// }
  
 // already in database
 userSchema.methods.generateAccessToken = function (){
+    // jwt.sign(payload, secret, options(define token lifetime))
     return jwt.sign(
         {
             _id : this._id,
@@ -78,12 +89,12 @@ userSchema.methods.generateRefreshToken = function (){
         {
             _id : this._id,
         },
-        process.env.REFRESH_TOKEN_SECRETE,
+        process.env.REFRESH_TOKEN_SECRET,
         {
             expiresIn : process.env.REFRESH_TOKEN_EXPIRY 
         }
     )
-}
+} 
 
 
 export const User = mongoose.model("User", userSchema)

@@ -23,6 +23,7 @@ const uploadOnCloudinary = async (localFilePath) =>{
     } catch (error) {
         //file load nhi hui to server pe hai,
         fs.unlinkSync(localFilePath) // remove, clean the locally saved temprorary file as the upload operation got failed
+        console.log("CLOUDINARY UPLOAD ERROR:", error)
         return null;
     }
 }
