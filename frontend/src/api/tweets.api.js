@@ -30,8 +30,11 @@ export const tweetsApi = {
    * @param {string} tweetId
    * @param {string} newcontent
    */
-  updateTweet: async (tweetId, newcontent) => {
-    return await apiClient.patch(`/tweets/${tweetId}`, { newcontent });
+  updateTweet: async (tweetId, content) => {
+    return await apiClient.patch(`/tweets/${tweetId}`, {
+      content,
+      newcontent: content,
+    });
   },
 
   /**
@@ -44,3 +47,4 @@ export const tweetsApi = {
 };
 
 export default tweetsApi;
+

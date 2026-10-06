@@ -98,12 +98,14 @@ const getPlaylistById = asyncHandler(async (req, res) => {
                 from: "videos",
                 localField: "videos",
                 foreignField: "_id",
-                as: "videos"
-            }
-        },
-        {
-            $match: {
-                "videos.isPublished": true
+                as: "videos",
+                pipeline: [
+                    {
+                        $match: {
+                            isPublished: true
+                        }
+                    }
+                ]
             }
         },
         {
@@ -139,6 +141,7 @@ const getPlaylistById = asyncHandler(async (req, res) => {
                     views: 1
                 },
                 owner: {
+                    _id: 1,
                     username: 1,
                     fullName: 1,
                     avatar: 1

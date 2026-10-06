@@ -90,11 +90,11 @@ const getUserTweets = asyncHandler(async (req, res) => {
 
 const updateTweet = asyncHandler(async (req, res) => {
     const {tweetId} = req.params
-    const {newcontent} = req.body
+    const content = req.body.newcontent || req.body.content
     if(!tweetId){
         throw new ApiError(400, "tweetId is required")
     }
-    if(!newcontent || newcontent.trim() !== ""){
+    if(!content || content.trim() === ""){
         throw new ApiError(400, "Content is required")
     }
     const tweet = await Tweet.findById(tweetId);
@@ -102,13 +102,13 @@ const updateTweet = asyncHandler(async (req, res) => {
         throw new ApiError(404, "tweet not found")
     }
     if(tweet.owner.toString() !== req.user._id.toString()){
-        throw new ApiError(404, "unauthorized request")
+        throw new ApiError(403, "unauthorized request")
     }
     const updatedTweet = await Tweet.findByIdAndUpdate(
         tweetId,
         {
             $set : {
-                content : newcontent,
+                content : content.trim(),
             }
         },
         {
@@ -136,10 +136,7 @@ const deleteTweet = asyncHandler(async (req, res) => {
     if(!tweet){
         throw new ApiError(404, "Tweet not found")
     }
-    // if(!tweet.owner.toString() || req.user._id.toString() === ""){
-    //     throw new ApiError(403, "unauthorized request")
-    // }
-    if(tweet.owner.toString() !== req.user._id){
+    if(tweet.owner.toString() !== req.user._id.toString()){
         throw new ApiError(403, "unauthorized request")
     }
     // await Tweet.findByIdAndDelete(

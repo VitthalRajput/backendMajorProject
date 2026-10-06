@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Heart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import likesApi from '../../api/likes.api.js';
@@ -9,6 +9,7 @@ export const LikedVideos = () => {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const hasPromptedAuth = useRef(false);
 
   const fetchLikedVideos = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -28,11 +29,14 @@ export const LikedVideos = () => {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      openAuthModal('login');
+      if (!hasPromptedAuth.current) {
+        hasPromptedAuth.current = true;
+        openAuthModal('login');
+      }
     } else {
       fetchLikedVideos();
     }
-  }, [isAuthenticated, fetchLikedVideos]);
+  }, [isAuthenticated, fetchLikedVideos, openAuthModal]);
 
   if (!isAuthenticated) {
     return (
@@ -94,3 +98,4 @@ export const LikedVideos = () => {
 };
 
 export default LikedVideos;
+

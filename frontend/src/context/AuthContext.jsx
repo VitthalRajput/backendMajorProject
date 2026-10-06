@@ -14,6 +14,13 @@ export const AuthProvider = ({ children }) => {
 
   // Verify and fetch current user on initial mount
   const checkAuth = useCallback(async () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       const currentUser = await authApi.getCurrentUser();
       if (currentUser) {
@@ -87,21 +94,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const openAuthModal = (mode = 'login', callback = null) => {
+  const openAuthModal = useCallback((mode = 'login', callback = null) => {
     setAuthModal({
       isOpen: true,
       mode,
       callback,
     });
-  };
+  }, []);
 
-  const closeAuthModal = () => {
+  const closeAuthModal = useCallback(() => {
     setAuthModal({
       isOpen: false,
       mode: 'login',
       callback: null,
     });
-  };
+  }, []);
 
   const value = {
     user,

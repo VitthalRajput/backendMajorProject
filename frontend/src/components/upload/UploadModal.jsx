@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Upload, Video, Image as ImageIcon, AlertCircle, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Video, Image as ImageIcon, AlertCircle, CheckCircle } from 'lucide-react';
 import videosApi from '../../api/videos.api.js';
 
 export const UploadModal = ({
@@ -25,6 +25,23 @@ export const UploadModal = ({
   const videoInputRef = useRef(null);
   const thumbInputRef = useRef(null);
 
+  const resetForm = useCallback(() => {
+    setVideoFile(null);
+    setThumbnailFile(null);
+    setThumbnailPreview('');
+    setTitle('');
+    setDescription('');
+    setStatus('ready');
+    setProgress(0);
+    setErrorMessage('');
+  }, []);
+
+  const handleModalClose = useCallback(() => {
+    if (status === 'uploading') return;
+    resetForm();
+    onClose();
+  }, [status, resetForm, onClose]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && isOpen && status !== 'uploading') {
@@ -39,24 +56,7 @@ export const UploadModal = ({
       window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, status]);
-
-  const resetForm = () => {
-    setVideoFile(null);
-    setThumbnailFile(null);
-    setThumbnailPreview('');
-    setTitle('');
-    setDescription('');
-    setStatus('ready');
-    setProgress(0);
-    setErrorMessage('');
-  };
-
-  const handleModalClose = () => {
-    if (status === 'uploading') return;
-    resetForm();
-    onClose();
-  };
+  }, [isOpen, status, handleModalClose]);
 
   const handleVideoSelect = (file) => {
     if (file && file.type.startsWith('video/')) {

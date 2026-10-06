@@ -16,3 +16,4 @@ export function formatDate(dateInput) {
 }
 
 export default formatDate;
+

@@ -140,3 +140,4 @@ export const HorizontalVideoCard = ({ video, className = '' }) => {
 };
 
 export default HorizontalVideoCard;
+

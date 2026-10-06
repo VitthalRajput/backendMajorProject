@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { History as HistoryIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import usersApi from '../../api/users.api.js';
@@ -12,6 +12,7 @@ export const History = () => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const hasPromptedAuth = useRef(false);
 
   const fetchHistory = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -31,11 +32,14 @@ export const History = () => {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      openAuthModal('login');
+      if (!hasPromptedAuth.current) {
+        hasPromptedAuth.current = true;
+        openAuthModal('login');
+      }
     } else {
       fetchHistory();
     }
-  }, [isAuthenticated, fetchHistory]);
+  }, [isAuthenticated, fetchHistory, openAuthModal]);
 
   if (!isAuthenticated) {
     return (

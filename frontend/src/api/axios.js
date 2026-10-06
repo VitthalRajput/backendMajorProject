@@ -56,9 +56,12 @@ apiClient.interceptors.response.use(
     const isAuthEndpoint =
       originalRequest.url?.includes('/users/login') ||
       originalRequest.url?.includes('/users/refresh-token') ||
-      originalRequest.url?.includes('/users/register');
+      originalRequest.url?.includes('/users/register') ||
+      originalRequest.url?.includes('/users/current-user');
 
-    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
+    const storedRefreshToken = localStorage.getItem('refreshToken');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint && storedRefreshToken) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -76,7 +79,6 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const storedRefreshToken = localStorage.getItem('refreshToken');
         const res = await axios.post(
           `${BASE_URL}/users/refresh-token`,
           { refreshToken: storedRefreshToken },
@@ -112,3 +114,4 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+
