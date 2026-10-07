@@ -1,52 +1,22 @@
-// require('dotenv').config({path : './env'})
 import dotenv from "dotenv"
 import connectDB from "./db/index.js";
-import { mongo } from "mongoose";
-import { DB_NAME } from "./constants.js";
-import { app } from "./app.js" 
+import { app } from "./app.js"
+import { startTranscodeWorker } from "./workers/transcode.worker.js"
 
 dotenv.config({
-    path : './.env'
+    path: './.env'
 })
 
 connectDB()
-.then(()=>{
-    app.listen(process.env.PORT || 8000, () =>{
-        console.log(`Server is running at ${process.env.PORT}`)
-    })
+.then(() => {
+    // Start background transcode worker
+    startTranscodeWorker();
+
+    const PORT = process.env.PORT || 8000;
+    app.listen(PORT, () => {
+        console.log(`Server is running at ${PORT}`);
+    });
 })
-.catch((error)=>{
-    console.log("MONGO DB connection Failed !!", error)
-
-})
-
-
-// function connectDB(){}
-
-// connectDB()
-
-// another best approach
-
-// ()() ==> ifiii
-
-/*
-import express from "express"
-const app = express() //creating app using express
-;(async()=>{
-    try {
-       await mongoose.connect(`${process.env.MONGODB_URI}/${DB_NAME}`)
-       app.on ("error", (error)=>{
-        console.log("ERRR:", error);
-        throw error
-
-       })
-
-       app.listen(process.env.PORT,()=>{
-        console.log (`App is listening on port ${process.env.PORT}`)
-       })
-
-    } catch (error) {
-        console.log(error);
-    }
-})()
-    */
+.catch((error) => {
+    console.log("MONGO DB connection Failed !!", error);
+});

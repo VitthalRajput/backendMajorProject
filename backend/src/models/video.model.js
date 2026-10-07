@@ -1,43 +1,77 @@
-import mongoose, {Schema} from "mongoose";
+import mongoose, { Schema } from "mongoose";
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
+
 const videoSchema = new Schema(
     {
-        videoFile : {
-            type : String, //c url
-            required : true,
+        videoFile: {
+            type: String, // HLS master manifest (.m3u8) or Cloudinary URL
+            default: "",
         },
-        thumbnail : {
-            type : String, 
-            required : true,
+        hlsManifest: {
+            type: String, // Direct HLS master playlist URL
+            default: "",
         },
-        title : {
-            type : String, 
-            required : true,
+        thumbnail: {
+            type: String, // Primary thumbnail
+            default: "",
         },
-        description : {
-            type : String, 
-            required : true,
+        thumbnails: {
+            type: [String], // Automated extracted thumbnails (e.g. 10%, 50%, 90%)
+            default: [],
         },
-        duration : {
-            type : Number, //cloudnary se milega
-            required : true,
+        title: {
+            type: String,
+            required: true,
+            trim: true,
         },
-        views : {
-            type : Number, 
+        description: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        duration: {
+            type: Number, // In seconds (extracted via ffprobe)
             default: 0,
         },
-        isPublished : {
-            type : Boolean,
+        status: {
+            type: String,
+            enum: ["processing", "ready", "failed"],
+            default: "processing",
+            index: true,
+        },
+        processingProgress: {
+            type: Number,
+            default: 0,
+            min: 0,
+            max: 100,
+        },
+        processingError: {
+            type: String,
+            default: null,
+        },
+        rawVideoPath: {
+            type: String,
+            default: "",
+        },
+        views: {
+            type: Number,
+            default: 0,
+        },
+        isPublished: {
+            type: Boolean,
             default: true,
         },
-        owner :{
-            type : Schema.Types.ObjectId,
-            ref : "User"
-        }
-    },{
-        timestamps : true
+        owner: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+        },
+    },
+    {
+        timestamps: true,
     }
-)
+);
 
-videoSchema.plugin(mongooseAggregatePaginate) //plugin is a hook
-export const Video = mongoose.model("Video", videoSchema)
+videoSchema.plugin(mongooseAggregatePaginate);
+
+export const Video = mongoose.model("Video", videoSchema);

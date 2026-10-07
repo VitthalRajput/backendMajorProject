@@ -3,6 +3,7 @@ import {
     getAllVideos,
     publishAVideo,
     getVideoById,
+    getVideoStatusStream,
     updateVideo,
     deleteVideo,
     togglePublishStatus
@@ -24,6 +25,10 @@ router.route("/").post(
     ]),
     publishAVideo
 )
+
+// Real-time SSE endpoint for video transcoding status updates
+router.route("/:videoId/status-stream").get(getVideoStatusStream)
+router.route("/status-stream/:videoId").get(getVideoStatusStream)
 
 // Public route to view video details
 router.route("/:videoId").get(getVideoById)

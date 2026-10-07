@@ -1,10 +1,11 @@
-import mongoose, {isValidObjectId} from "mongoose"
-import {Video} from "../models/video.model.js"
-import {User} from "../models/user.model.js"
-import {ApiError} from "../utils/ApiError.js"
-import {ApiResponse} from "../utils/ApiResponse.js"
-import {asyncHandler} from "../utils/asyncHandler.js"
-import {uploadOnCloudinary} from "../utils/cloudinary.js"
+import mongoose, { isValidObjectId } from "mongoose"
+import { Video } from "../models/video.model.js"
+import { ApiError } from "../utils/ApiError.js"
+import { ApiResponse } from "../utils/ApiResponse.js"
+import { asyncHandler } from "../utils/asyncHandler.js"
+import { uploadOnCloudinary } from "../utils/cloudinary.js"
+import { addTranscodeJob } from "../services/queue.service.js"
+import { notificationService } from "../services/notification.service.js"
 
 const getAllVideos = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
@@ -72,7 +73,9 @@ const getAllVideos = asyncHandler(async (req, res) => {
         },
         {
             $addFields: {
-                owner: { $first: "$owner" }
+                owner: {
+                    $first: "$owner"
+                }
             }
         }
     )
@@ -110,39 +113,49 @@ const publishAVideo = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Video file is required")
     }
 
-    if (!thumbnailLocalPath) {
-        throw new ApiError(400, "Thumbnail is required")
+    let thumbnailUrl = ""
+    if (thumbnailLocalPath) {
+        try {
+            const uploadedThumbnail = await uploadOnCloudinary(thumbnailLocalPath)
+            if (uploadedThumbnail?.url) {
+                thumbnailUrl = uploadedThumbnail.url
+            }
+        } catch (thumbErr) {
+            console.warn("[Thumbnail Upload Warning]: Could not upload to Cloudinary:", thumbErr.message)
+        }
     }
 
-    const videoFile = await uploadOnCloudinary(videoFileLocalPath)
-    const thumbnail = await uploadOnCloudinary(thumbnailLocalPath)
-
-    if (!videoFile) {
-        throw new ApiError(500, "Failed to upload video file")
-    }
-
-    if (!thumbnail) {
-        throw new ApiError(500, "Failed to upload thumbnail")
-    }
-
+    // Create video record with processing status
     const video = await Video.create({
-        videoFile: videoFile.url,
-        thumbnail: thumbnail.url,
-        title,
-        description,
-        duration: videoFile.duration,
-        owner: req.user?._id
+        videoFile: "", // Will be populated with HLS master manifest once transcoding completes
+        thumbnail: thumbnailUrl,
+        title: title.trim(),
+        description: description.trim(),
+        duration: 0,
+        status: "processing",
+        processingProgress: 0,
+        rawVideoPath: videoFileLocalPath,
+        owner: req.user?._id,
+        isPublished: true
     })
 
     const createdVideo = await Video.findById(video._id)
 
     if (!createdVideo) {
-        throw new ApiError(500, "Something went wrong while publishing the video")
+        throw new ApiError(500, "Something went wrong while creating the video record")
     }
 
+    // Enqueue transcode job in BullMQ
+    await addTranscodeJob({
+        videoId: createdVideo._id.toString(),
+        videoFilePath: videoFileLocalPath,
+        customThumbnailPath: thumbnailLocalPath
+    })
+
+    // Return HTTP 202 Accepted immediately
     return res
-        .status(201)
-        .json(new ApiResponse(201, createdVideo, "Video published successfully"))
+        .status(202)
+        .json(new ApiResponse(202, createdVideo, "Video uploaded successfully. Transcoding started in background."))
 })
 
 const getVideoById = asyncHandler(async (req, res) => {
@@ -195,6 +208,49 @@ const getVideoById = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, video[0], "Video fetched successfully"))
 })
 
+const getVideoStatusStream = asyncHandler(async (req, res) => {
+    const videoId = req.params.videoId || req.params.id
+
+    if (!isValidObjectId(videoId)) {
+        throw new ApiError(400, "Invalid video id")
+    }
+
+    const video = await Video.findById(videoId)
+    if (!video) {
+        throw new ApiError(404, "Video not found")
+    }
+
+    // Set headers for Server-Sent Events (SSE)
+    res.setHeader("Content-Type", "text/event-stream")
+    res.setHeader("Cache-Control", "no-cache, no-transform")
+    res.setHeader("Connection", "keep-alive")
+    res.setHeader("X-Accel-Buffering", "no")
+    if (res.flushHeaders) res.flushHeaders()
+
+    // Send initial status immediately
+    const initialPayload = JSON.stringify({
+        videoId: video._id,
+        status: video.status,
+        progress: video.processingProgress || 0,
+        message: `Video is currently ${video.status}`,
+        hlsManifest: video.hlsManifest,
+        thumbnails: video.thumbnails,
+        duration: video.duration,
+        error: video.processingError
+    })
+
+    res.write(`event: progress\ndata: ${initialPayload}\n\n`)
+
+    // If already finalized, close stream
+    if (video.status === "ready" || video.status === "failed") {
+        res.write(`event: done\ndata: ${initialPayload}\n\n`)
+        return res.end()
+    }
+
+    // Register active subscriber for live progress events
+    notificationService.addSubscriber(videoId, res)
+})
+
 const updateVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     const { title, description } = req.body
@@ -219,10 +275,9 @@ const updateVideo = asyncHandler(async (req, res) => {
     const thumbnailLocalPath = req.file?.path
     if (thumbnailLocalPath) {
         const thumbnail = await uploadOnCloudinary(thumbnailLocalPath)
-        if (!thumbnail) {
-            throw new ApiError(500, "Failed to upload thumbnail")
+        if (thumbnail) {
+            updateFields.thumbnail = thumbnail.url
         }
-        updateFields.thumbnail = thumbnail.url
     }
 
     const updatedVideo = await Video.findByIdAndUpdate(
@@ -290,6 +345,7 @@ export {
     getAllVideos,
     publishAVideo,
     getVideoById,
+    getVideoStatusStream,
     updateVideo,
     deleteVideo,
     togglePublishStatus

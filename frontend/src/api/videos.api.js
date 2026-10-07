@@ -54,6 +54,46 @@ export const videosApi = {
   togglePublishStatus: async (videoId) => {
     return await apiClient.patch(`/videos/toggle/publish/${videoId}`);
   },
+
+  /**
+   * Subscribe to real-time transcoding progress updates via Server-Sent Events (SSE)
+   * @param {string} videoId
+   * @param {(data: any) => void} onProgress
+   * @param {(err: any) => void} [onError]
+   * @returns {() => void} Unsubscribe cleanup function
+   */
+  subscribeToStatusStream: (videoId, onProgress, onError) => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+    const eventSource = new EventSource(`${baseUrl}/videos/${videoId}/status-stream`, {
+      withCredentials: true,
+    });
+
+    eventSource.addEventListener('progress', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (onProgress) onProgress(data);
+      } catch (err) {
+        console.warn('Error parsing SSE event:', err);
+      }
+    });
+
+    eventSource.addEventListener('done', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (onProgress) onProgress(data);
+      } catch (err) {
+        // no-op
+      }
+      eventSource.close();
+    });
+
+    eventSource.onerror = (err) => {
+      if (onError) onError(err);
+      eventSource.close();
+    };
+
+    return () => eventSource.close();
+  },
 };
 
 export default videosApi;
