@@ -4,6 +4,7 @@ import {Video} from "../models/video.model.js"
 import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
+import {invalidateCommentCache} from "../utils/cache.js"
 
 const getVideoComments = asyncHandler(async (req, res) => {
     const { videoId } = req.params
@@ -126,6 +127,9 @@ const addComment = asyncHandler(async (req, res) => {
     const populatedComment = await Comment.findById(comment._id)
         .populate("owner", "username email avatar")
 
+    // Purge stale Redis cache keys for this video's comments
+    await invalidateCommentCache(videoId)
+
     return res
     .status(201)
     .json( new ApiResponse(
@@ -164,6 +168,9 @@ const updateComment = asyncHandler(async (req, res) => {
         }
     )
 
+    // Purge stale Redis cache keys for this video's comments
+    await invalidateCommentCache(comment.video)
+
     return res
     .status(200)
     .json(
@@ -188,6 +195,10 @@ const deleteComment = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Unauthorized request")
     }
     await Comment.findByIdAndDelete(commentId)
+
+    // Purge stale Redis cache keys for this video's comments
+    await invalidateCommentCache(comment.video)
+
     return res
     .status(200)
     .json(

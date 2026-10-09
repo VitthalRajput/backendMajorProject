@@ -1,8 +1,10 @@
 import mongoose, {isValidObjectId} from "mongoose"
 import {Like} from "../models/like.model.js"
+import {Comment} from "../models/comment.model.js"
 import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
+import {invalidateVideoLikesCache, invalidateCommentCache} from "../utils/cache.js"
 import { existsSync } from "fs"
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
@@ -19,6 +21,10 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
     if(existingVideoLike){
         // await Like.findByIdAndDelete(videoId) -> you have to delete the like document
         await Like.findByIdAndDelete(existingVideoLike._id)
+
+        // Purge video cache on dislike
+        await invalidateVideoLikesCache(videoId)
+
         return res
         .status(200)
         .json(
@@ -38,6 +44,9 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
             likedBy : req.user._id,
             video : videoId
         })
+
+        // Purge video cache on like
+        await invalidateVideoLikesCache(videoId)
 
         return res
         .status(200)
@@ -64,6 +73,13 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
 
     if(existingCommentLike){
         await Like.findByIdAndDelete(existingCommentLike._id)
+
+        // Invalidate comment cache for the video this comment belongs to
+        const commentDoc = await Comment.findById(commentId).select("video")
+        if (commentDoc?.video) {
+            await invalidateCommentCache(commentDoc.video)
+        }
+
         return res
         .status(200)
         .json(
@@ -79,6 +95,13 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
             likedBy : req.user._id,
             comment : commentId
         })
+
+        // Invalidate comment cache for the video this comment belongs to
+        const commentDoc = await Comment.findById(commentId).select("video")
+        if (commentDoc?.video) {
+            await invalidateCommentCache(commentDoc.video)
+        }
+
         return res
         .status(200)
         .json(

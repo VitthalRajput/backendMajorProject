@@ -31,6 +31,7 @@ app.use(cookieParser())
 
 // routes import 
 import healthcheckRouter from "./routes/healthcheck.routes.js"
+import authRouter from "./routes/auth.routes.js"
 import userRouter from './routes/user.routes.js'
 import videoRouter from "./routes/video.routes.js"
 import tweetRouter from "./routes/tweet.routes.js"
@@ -39,9 +40,15 @@ import commentRouter from "./routes/comment.routes.js"
 import likeRouter from "./routes/like.routes.js"
 import playlistRouter from "./routes/playlist.routes.js"
 import dashboardRouter from "./routes/dashboard.routes.js"
+import analyticsRouter from "./routes/analytics.routes.js"
+import { standardApiLimiter } from "./middlewares/rateLimiter.middleware.js"
+
+// Standard API rate limiter applied to all API v1 endpoints
+app.use("/api/v1", standardApiLimiter)
 
 // routes declaration
 app.use("/api/v1/healthcheck", healthcheckRouter)
+app.use("/api/v1/auth", authRouter)
 app.use("/api/v1/users", userRouter)
 app.use("/api/v1/videos", videoRouter)
 app.use("/api/v1/tweets", tweetRouter)
@@ -50,6 +57,7 @@ app.use("/api/v1/comments", commentRouter)
 app.use("/api/v1/likes", likeRouter)
 app.use("/api/v1/playlist", playlistRouter)
 app.use("/api/v1/dashboard", dashboardRouter)
+app.use("/api/v1/analytics", analyticsRouter)
 
 // Global JSON error handling middleware
 app.use((err, req, res, next) => {

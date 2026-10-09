@@ -6,6 +6,7 @@ import { asyncHandler } from "../utils/asyncHandler.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js"
 import { addTranscodeJob } from "../services/queue.service.js"
 import { notificationService } from "../services/notification.service.js"
+import { invalidateVideoCache, invalidateCommentCache } from "../utils/cache.js"
 
 const getAllVideos = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
@@ -251,6 +252,62 @@ const getVideoStatusStream = asyncHandler(async (req, res) => {
     notificationService.addSubscriber(videoId, res)
 })
 
+const getTrendingVideos = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 10 } = req.query
+
+    const pipeline = [
+        {
+            $match: {
+                isPublished: true
+            }
+        },
+        {
+            $sort: {
+                views: -1,
+                createdAt: -1
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+                pipeline: [
+                    {
+                        $project: {
+                            username: 1,
+                            fullName: 1,
+                            avatar: 1
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            $addFields: {
+                owner: {
+                    $first: "$owner"
+                }
+            }
+        }
+    ]
+
+    const options = {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10)
+    }
+
+    const videos = await Video.aggregatePaginate(
+        Video.aggregate(pipeline),
+        options
+    )
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, videos, "Trending videos fetched successfully"))
+})
+
 const updateVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     const { title, description } = req.body
@@ -286,6 +343,9 @@ const updateVideo = asyncHandler(async (req, res) => {
         { new: true }
     )
 
+    // Purge stale Redis cache keys
+    await invalidateVideoCache(videoId)
+
     return res
         .status(200)
         .json(new ApiResponse(200, updatedVideo, "Video updated successfully"))
@@ -308,6 +368,10 @@ const deleteVideo = asyncHandler(async (req, res) => {
     }
 
     await Video.findByIdAndDelete(videoId)
+
+    // Purge stale Redis cache keys for video and related comments
+    await invalidateVideoCache(videoId)
+    await invalidateCommentCache(videoId)
 
     return res
         .status(200)
@@ -336,6 +400,9 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
         { new: true }
     )
 
+    // Purge stale Redis cache keys
+    await invalidateVideoCache(videoId)
+
     return res
         .status(200)
         .json(new ApiResponse(200, updatedVideo, "Publish status toggled successfully"))
@@ -343,6 +410,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
 
 export {
     getAllVideos,
+    getTrendingVideos,
     publishAVideo,
     getVideoById,
     getVideoStatusStream,
